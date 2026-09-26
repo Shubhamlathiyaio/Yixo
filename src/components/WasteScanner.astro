@@ -1,0 +1,741 @@
+---
+/**
+ * Component A — AI Waste Scanner Workspace.
+ *
+ * Owns the file-handling engine, the simulated terminal boot sequence and the
+ * structured result payload. Completed scans are written into the shared
+ * telemetry store, which the dashboard subscribes to.
+ */
+
+import { BOOT_SEQUENCE, CATEGORY_META, WASTE_ITEMS } from '../data/recycle';
+---
+
+<article id="scanner" class="panel scroll-mt-28 overflow-hidden" aria-labelledby="scanner-title">
+	<!-- Panel header -->
+	<header class="flex flex-wrap items-start justify-between gap-4 border-b border-line px-5 py-4 lg:px-6">
+		<div class="min-w-0">
+			<p class="eyebrow">vision.engine / workspace</p>
+			<h2 id="scanner-title" class="mt-1 text-lg font-semibold tracking-tight text-ink">
+				AI Waste Scanner
+			</h2>
+		</div>
+		<div class="flex items-center gap-3">
+			<span
+				class="inline-flex items-center gap-2 rounded-full border border-line px-2.5 py-1 font-mono text-2xs tracking-[0.1em] text-mute uppercase"
+				data-engine-state
+			>
+				<span class="dot" data-engine-dot aria-hidden="true"></span>
+				<span data-engine-label>standby</span>
+			</span>
+			<button type="button" class="btn btn-sm" data-clear-scans>Reset</button>
+		</div>
+	</header>
+
+	<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px]">
+		<!-- ===================== Input column ===================== -->
+		<div class="min-w-0 border-line xl:border-r">
+			<div class="p-5 lg:p-6">
+				<!-- Drop zone -->
+				<div
+					class="dropzone group relative flex min-h-[264px] flex-col items-center justify-center overflow-hidden rounded-lg px-6 py-10 text-center"
+					data-dropzone
+					role="button"
+					tabindex="0"
+					aria-label="Upload a waste image for analysis, or press Enter to browse files"
+				>
+					<!-- Idle state -->
+					<div class="flex flex-col items-center" data-drop-idle>
+						<span
+							class="mb-5 grid h-12 w-12 place-items-center rounded-md border border-line bg-card text-mute transition-colors group-hover:text-ink"
+							aria-hidden="true"
+						>
+							<svg
+								width="20"
+								height="20"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+								<polyline points="17 8 12 3 7 8"></polyline>
+								<line x1="12" y1="3" x2="12" y2="15"></line>
+							</svg>
+						</span>
+						<p class="text-lg font-semibold tracking-tight text-ink">Drop a waste image</p>
+						<p class="dropzone-hint mt-1.5 max-w-sm text-sm text-mute transition-colors">
+							Click, drag &amp; drop, or press
+							<span class="font-mono text-body">Enter</span> to browse. PNG, JPG, WEBP or HEIC
+							up to 12 MB.
+						</p>
+						<span class="btn btn-primary mt-5" aria-hidden="true">Select file</span>
+					</div>
+
+					<!-- Busy state: uploaded image, or a synthetic frame for demo keys -->
+					<div class="hidden w-full flex-col items-center gap-4" data-drop-busy>
+						<div
+							class="relative overflow-hidden rounded-md border border-line bg-card"
+							data-preview-frame
+						>
+							<img
+								data-preview
+								alt="Uploaded waste sample"
+								width="200"
+								height="150"
+								class="hidden h-[150px] w-[200px] object-cover opacity-70"
+							/>
+							<div
+								class="hidden h-[150px] w-[200px] place-items-center font-mono text-2xs tracking-[0.16em] text-faint uppercase"
+								data-synth-frame
+							>
+								synthetic input
+							</div>
+							<span class="sweep-line" aria-hidden="true"></span>
+						</div>
+						<div class="w-full max-w-[240px] text-center">
+							<p class="truncate font-mono text-sm text-ink" data-source-name>—</p>
+							<p
+								class="mt-1 font-mono text-2xs tracking-[0.1em] text-mute uppercase"
+								data-source-meta
+							>
+								decoding
+							</p>
+						</div>
+					</div>
+
+					<input
+						type="file"
+						class="sr-only"
+						data-file-input
+						accept="image/png,image/jpeg,image/webp,image/heic,image/avif"
+					/>
+				</div>
+
+				<!-- Demo Mode Quick-Keys -->
+				<div class="mt-6">
+					<div class="mb-3 flex items-center gap-3">
+						<p class="eyebrow">demo.mode / quick-keys</p>
+						<span class="h-px flex-1 bg-line-soft" aria-hidden="true"></span>
+					</div>
+					<div
+						class="grid grid-cols-2 gap-2 sm:grid-cols-4"
+						role="group"
+						aria-label="Demo material quick keys"
+					>
+						{
+							WASTE_ITEMS.map((item) => (
+								<button
+									type="button"
+									class="quickkey group flex items-center gap-2.5 px-2.5 py-2 text-left"
+									data-quick-key={item.id}
+									aria-pressed="false"
+									aria-label={`Run demo scan for ${item.label}`}
+								>
+									<span class="grid h-8 w-8 shrink-0 place-items-center rounded-xs border border-line bg-surface font-mono text-2xs tracking-[0.04em] text-mute transition-colors group-hover:text-ink">
+										{item.code.slice(0, 4)}
+									</span>
+									<span class="min-w-0">
+										<span class="quickkey-code block truncate text-sm text-ink">
+											{item.label}
+										</span>
+										<span class="block truncate font-mono text-2xs text-faint">
+											{item.categoryLabel}
+										</span>
+									</span>
+								</button>
+							))
+						}
+					</div>
+				</div>
+			</div>
+
+			<!-- Terminal -->
+			<div class="border-t border-line">
+				<div class="flex items-center justify-between px-5 py-2.5 lg:px-6">
+					<div class="flex items-center gap-2">
+						<span class="dot" data-terminal-dot aria-hidden="true"></span>
+						<span class="font-mono text-2xs tracking-[0.12em] text-mute uppercase">
+							scan.terminal
+						</span>
+					</div>
+					<span class="tnum font-mono text-2xs text-faint" data-terminal-clock>0.00 s</span>
+				</div>
+				<div
+					class="max-h-[190px] min-h-[112px] overflow-y-auto border-t border-line-soft bg-canvas px-5 py-3 font-mono text-sm lg:px-6"
+					data-terminal
+					role="log"
+					aria-live="polite"
+					aria-label="Vision engine boot log"
+				>
+					<p class="text-faint"><span class="text-mute">$</span> reuse-scan --await-input</p>
+					<p class="mt-1 text-faint">Waiting for a source image or a quick key.</p>
+				</div>
+			</div>
+		</div>
+
+		<!-- ===================== Payload column ===================== -->
+		<div class="flex min-w-0 flex-col">
+			<div class="flex items-center justify-between gap-3 border-b border-line px-5 py-3 lg:px-6">
+				<p class="eyebrow">response.body</p>
+				<div class="flex items-center gap-1.5" role="group" aria-label="Payload view mode">
+					<button type="button" class="btn btn-sm" data-view="formatted" aria-pressed="true">
+						Formatted
+					</button>
+					<button type="button" class="btn btn-sm" data-view="json" aria-pressed="false">
+						JSON
+					</button>
+				</div>
+			</div>
+
+			<!-- Empty state -->
+			<div
+				class="flex flex-1 flex-col items-center justify-center px-6 py-14 text-center"
+				data-result-empty
+			>
+				<span class="mb-4 font-mono text-3xl text-faint" aria-hidden="true">{ }</span>
+				<p class="text-sm text-mute">No payload resolved.</p>
+				<p class="mt-1 max-w-[28ch] text-sm text-faint">
+					Run a quick key or upload an image to receive a sorting directive.
+				</p>
+			</div>
+
+			<!-- Structured payload -->
+			<div class="hidden flex-1 flex-col" data-result-shell>
+				<!-- Identity -->
+				<div class="border-b border-line px-5 py-4 lg:px-6">
+					<div class="flex flex-wrap items-center justify-between gap-3">
+						<span class="cat-tag" data-result-tag>
+							<span class="cat-dot" aria-hidden="true"></span>
+							<span data-result-category>—</span>
+						</span>
+						<span
+							class="font-mono text-2xs tracking-[0.08em] text-faint uppercase"
+							data-result-latency>latency 0 ms</span
+						>
+					</div>
+					<h3 class="mt-3 text-2xl font-semibold tracking-tight text-ink" data-result-name>—</h3>
+					<p class="mt-1 font-mono text-sm text-mute" data-result-material>—</p>
+				</div>
+
+				<!-- Formatted view -->
+				<div class="flex flex-col" data-view-formatted>
+					<div class="border-b border-line px-5 py-4 lg:px-6">
+						<p class="eyebrow">smart.sort.directive</p>
+						<p class="mt-2 text-lg font-semibold tracking-tight text-ink" data-result-destination>
+							—
+						</p>
+						<p class="mt-1.5 text-sm text-body" data-result-pathway>—</p>
+					</div>
+
+					<dl class="grid grid-cols-2 border-b border-line">
+						<div class="border-r border-b border-line px-5 py-3.5 lg:px-6">
+							<dt class="eyebrow">code</dt>
+							<dd class="mt-1 font-mono text-sm text-ink" data-result-code>—</dd>
+						</div>
+						<div class="border-b border-line px-5 py-3.5 lg:px-6">
+							<dt class="eyebrow">mass</dt>
+							<dd class="tnum mt-1 font-mono text-sm text-ink" data-result-mass>—</dd>
+						</div>
+						<div class="border-r border-line px-5 py-3.5 lg:px-6">
+							<dt class="eyebrow">contamination</dt>
+							<dd class="mt-1 font-mono text-sm text-ink" data-result-risk>—</dd>
+						</div>
+						<div class="px-5 py-3.5 lg:px-6">
+							<dt class="eyebrow">decomposition</dt>
+							<dd class="tnum mt-1 font-mono text-sm text-ink" data-result-decompose>—</dd>
+						</div>
+					</dl>
+
+					<div class="border-b border-line px-5 py-4 lg:px-6">
+						<p class="eyebrow">handling.protocol</p>
+						<ol class="mt-3 flex flex-col gap-2.5" data-result-steps></ol>
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-2">
+						<div class="border-b border-line px-5 py-4 sm:border-r sm:border-b-0 lg:px-6">
+							<p class="eyebrow">circular.economy</p>
+							<p class="mt-2 text-sm text-body" data-result-upcycle>—</p>
+						</div>
+						<div class="px-5 py-4 lg:px-6">
+							<p class="eyebrow">carbon.offset</p>
+							<p
+								class="glow tnum mt-2 font-mono text-xl font-medium text-accent"
+								data-result-carbon>—</p
+							>
+							<p class="mt-1 font-mono text-2xs text-faint" data-result-payload-mass>—</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- JSON view -->
+				<div class="hidden flex-1 flex-col p-5 lg:p-6" data-view-json>
+					<pre class="json-view flex-1" data-json-output><code>{ }</code></pre>
+					<div class="mt-3 flex items-center gap-3">
+						<button type="button" class="btn btn-sm" data-copy-json>Copy payload</button>
+						<span class="font-mono text-2xs text-faint" data-copy-status aria-live="polite"
+						></span>
+					</div>
+				</div>
+
+				<!-- Confidence -->
+				<div class="border-t border-line px-5 py-4 lg:px-6">
+					<div class="mb-2 flex items-center justify-between">
+						<p class="eyebrow">model.confidence</p>
+						<p class="tnum font-mono text-sm text-ink" data-result-confidence>0.0%</p>
+					</div>
+					<div
+						class="h-1 w-full overflow-hidden rounded-full bg-line"
+						role="progressbar"
+						aria-label="Model confidence"
+						aria-valuemin="0"
+						aria-valuemax="100"
+						aria-valuenow="0"
+						data-confidence-track
+					>
+						<span class="block h-full w-0 rounded-full bg-accent" data-confidence-fill></span>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<p class="sr-only" role="status" aria-live="polite" data-announcer></p>
+</article>
+
+<script>
+	import { BOOT_SEQUENCE, CATEGORY_META, WASTE_ITEMS, type WasteItem } from '../data/recycle';
+	import { fmt, registerScan } from '../lib/telemetry';
+
+	const root = document.getElementById('scanner') as HTMLElement | null;
+
+	if (root) {
+		const pick = <T extends Element>(selector: string): T =>
+			root.querySelector(selector) as T;
+
+		const dropzone = pick('[data-dropzone]');
+		const fileInput = pick<HTMLInputElement>('[data-file-input]');
+		const idleState = pick('[data-drop-idle]');
+		const busyState = pick('[data-drop-busy]');
+		const previewFrame = pick('[data-preview-frame]');
+		const preview = pick<HTMLImageElement>('[data-preview]');
+		const synthFrame = pick('[data-synth-frame]');
+		const sourceName = pick('[data-source-name]');
+		const sourceMeta = pick('[data-source-meta]');
+
+		const engineDot = pick('[data-engine-dot]');
+		const engineLabel = pick('[data-engine-label]');
+		const terminal = pick('[data-terminal]');
+		const terminalDot = pick('[data-terminal-dot]');
+		const terminalClock = pick('[data-terminal-clock]');
+
+		const resultEmpty = pick('[data-result-empty]');
+		const resultShell = pick('[data-result-shell]');
+		const resultTag = pick('[data-result-tag]');
+		const resultCategory = pick('[data-result-category]');
+		const resultLatency = pick('[data-result-latency]');
+		const resultName = pick('[data-result-name]');
+		const resultMaterial = pick('[data-result-material]');
+		const resultDestination = pick('[data-result-destination]');
+		const resultPathway = pick('[data-result-pathway]');
+		const resultCode = pick('[data-result-code]');
+		const resultMass = pick('[data-result-mass]');
+		const resultRisk = pick('[data-result-risk]');
+		const resultDecompose = pick('[data-result-decompose]');
+		const resultSteps = pick('[data-result-steps]');
+		const resultUpcycle = pick('[data-result-upcycle]');
+		const resultCarbon = pick('[data-result-carbon]');
+		const resultPayloadMass = pick('[data-result-payload-mass]');
+		const resultConfidence = pick('[data-result-confidence]');
+		const confidenceTrack = pick('[data-confidence-track]');
+		const confidenceFill = pick('[data-confidence-fill]');
+		const jsonOutput = pick('[data-json-output]');
+		const copyButton = pick<HTMLButtonElement>('[data-copy-json]');
+		const copyStatus = pick('[data-copy-status]');
+		const announcer = pick('[data-announcer]');
+		const clearButton = pick('[data-clear-scans]');
+		const viewButtons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-view]'));
+		const viewFormatted = pick('[data-view-formatted]');
+		const viewJson = pick('[data-view-json]');
+		const quickKeys = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-quick-key]'));
+
+		const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+		const MAX_BYTES = 12 * 1_048_576;
+
+		let runToken = 0;
+		let objectUrl: string | null = null;
+		let payloadJson = '';
+
+		/* ---------------- Terminal ---------------- */
+
+		function writeLine(html: string): void {
+			const line = document.createElement('p');
+			line.className = 'term-line mt-1 text-body';
+			line.innerHTML = html;
+			terminal.appendChild(line);
+			terminal.scrollTop = terminal.scrollHeight;
+		}
+
+		function resetTerminal(): void {
+			terminal.innerHTML =
+				'<p class="text-faint"><span class="text-mute">$</span> reuse-scan --start</p>';
+			terminalClock.textContent = '0.00 s';
+		}
+
+		function setEngineState(state: 'standby' | 'scanning' | 'resolved' | 'error', label: string): void {
+			engineDot.className = `dot ${
+				state === 'resolved' ? 'dot-live' : state === 'scanning' ? 'dot-pulse' : ''
+			}`;
+			engineLabel.textContent = label;
+			terminalDot.className = `dot ${
+				state === 'scanning' ? 'dot-pulse' : state === 'resolved' ? 'dot-live' : ''
+			}`;
+		}
+
+		/* ---------------- Payload ---------------- */
+
+		function buildPayload(item: WasteItem, latency: number): Record<string, unknown> {
+			return {
+				scan_id: `sc_${item.id}_${latency.toString(16)}`,
+				timestamp: new Date().toISOString(),
+				category: item.category,
+				category_label: item.categoryLabel,
+				identification: {
+					name: item.itemName,
+					material: item.material,
+					recycle_code: item.recycleCode,
+					mass_kg: item.massKg,
+					confidence: Number(item.confidence.toFixed(1)),
+					contamination_risk: item.contaminationRisk,
+					decomposition_years: item.decompositionYears,
+				},
+				sorting: {
+					destination: item.sortDestination,
+					pathway: item.pathwayDetail,
+				},
+				handling_protocol: item.handlingSteps,
+				circular_economy: { upcycle: item.upcycle },
+				carbon_offset_kg: -Number(item.carbonOffset.toFixed(2)),
+				latency_ms: latency,
+			};
+		}
+
+		/** Escaped JSON pretty-printer with token classes. */
+		function highlight(value: unknown, indent = 0): string {
+			const pad = '  '.repeat(indent);
+			const padIn = '  '.repeat(indent + 1);
+
+			if (Array.isArray(value)) {
+				if (value.length === 0) return '[]';
+				const body = value.map((entry) => `${padIn}${highlight(entry, indent + 1)}`).join(',\n');
+				return `[\n${body}\n${pad}]`;
+			}
+
+			if (value !== null && typeof value === 'object') {
+				const entries = Object.entries(value as Record<string, unknown>);
+				if (entries.length === 0) return '{}';
+				const body = entries
+					.map(
+						([key, entry]) =>
+							`${padIn}<span class="json-key">"${key}"</span>: ${highlight(entry, indent + 1)}`,
+					)
+					.join(',\n');
+				return `{\n${body}\n${pad}}`;
+			}
+
+			if (typeof value === 'number') return `<span class="json-num">${value}</span>`;
+			if (typeof value === 'boolean') return `<span class="json-bool">${value}</span>`;
+			const escaped = String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+			return `<span class="json-str">"${escaped}"</span>`;
+		}
+
+		function reveal(shell: HTMLElement): void {
+			shell.removeAttribute('data-fresh');
+			void shell.offsetWidth; // force reflow so the animation replays
+			shell.setAttribute('data-fresh', '');
+		}
+
+		function renderPayload(item: WasteItem, latency: number): void {
+			const meta = CATEGORY_META[item.category];
+			const payload = buildPayload(item, latency);
+
+			payloadJson = JSON.stringify(payload, null, 2);
+			jsonOutput.innerHTML = `<code>${highlight(payload)}</code>`;
+
+			resultTag.style.setProperty('--tag-color', meta.hex);
+			resultCategory.textContent = item.categoryLabel;
+			resultLatency.textContent = `latency ${latency} ms`;
+			resultName.textContent = item.itemName;
+			resultMaterial.textContent = item.material;
+			resultDestination.textContent = item.sortDestination;
+			resultPathway.textContent = item.pathwayDetail;
+			resultCode.textContent = item.recycleCode;
+			resultMass.textContent = `${fmt.two(item.massKg)} kg`;
+			resultRisk.textContent = `${item.contaminationRisk} risk`;
+			resultDecompose.textContent = `${fmt.integer(item.decompositionYears)} yr`;
+			resultUpcycle.textContent = item.upcycle;
+			resultCarbon.textContent = fmt.offset(item.carbonOffset);
+			resultPayloadMass.textContent = `${fmt.two(item.massKg)} kg scanned · ${meta.recovery}`;
+			resultConfidence.textContent = `${fmt.one(item.confidence)}%`;
+
+			resultSteps.innerHTML = item.handlingSteps
+				.map(
+					(step, index) => `
+					<li class="flex gap-3 text-sm text-body">
+						<span class="mt-px font-mono text-2xs text-faint">${String(index + 1).padStart(2, '0')}</span>
+						<span>${step}</span>
+					</li>`,
+				)
+				.join('');
+
+			confidenceTrack.setAttribute('aria-valuenow', item.confidence.toFixed(1));
+			confidenceFill.style.width = '0%';
+			requestAnimationFrame(() => {
+				confidenceFill.style.width = `${item.confidence}%`;
+			});
+
+			resultEmpty.classList.add('hidden');
+			resultShell.classList.remove('hidden');
+			reveal(resultShell);
+		}
+
+		/* ---------------- Scan engine ---------------- */
+
+		function releasePreview(): void {
+			if (objectUrl) {
+				URL.revokeObjectURL(objectUrl);
+				objectUrl = null;
+			}
+			preview.classList.add('hidden');
+			synthFrame.classList.add('hidden');
+			previewFrame.classList.remove('hidden');
+		}
+
+		function showBusy(
+			source: { name: string; meta: string; url: string | null },
+		): void {
+			sourceName.textContent = source.name;
+			sourceMeta.textContent = source.meta;
+			releasePreview();
+			if (source.url) {
+				preview.src = source.url;
+				preview.classList.remove('hidden');
+			} else {
+				synthFrame.classList.remove('hidden');
+				synthFrame.classList.add('grid');
+			}
+			idleState.classList.add('hidden');
+			busyState.classList.remove('hidden');
+			busyState.classList.add('flex');
+		}
+
+		async function runScan(
+			item: WasteItem,
+			source: { name: string; meta: string; url: string | null },
+			options: { register?: boolean } = {},
+		): Promise<void> {
+			const token = ++runToken;
+			const startedAt = performance.now();
+			const elapsed = () => performance.now() - startedAt;
+			const shouldRegister = options.register ?? true;
+
+			quickKeys.forEach((key) =>
+				key.setAttribute('aria-pressed', String(key.dataset.quickKey === item.id)),
+			);
+
+			showBusy(source);
+			sourceMeta.textContent = 'decoding';
+			setEngineState('scanning', 'scanning');
+			resetTerminal();
+			resultEmpty.classList.remove('hidden');
+			resultShell.classList.add('hidden');
+			announcer.textContent = `Analysing ${item.label}.`;
+
+			for (const step of BOOT_SEQUENCE) {
+				const remaining = step.at - elapsed();
+				if (remaining > 0) await sleep(remaining);
+				if (token !== runToken) return;
+
+				terminalClock.textContent = `${(elapsed() / 1000).toFixed(2)} s`;
+				const marker =
+					step.kind === 'ok'
+						? '<span class="text-accent">[ok]</span>'
+						: '<span class="text-faint">[..]</span>';
+				writeLine(`${marker} <span class="text-ink">${step.line}</span>`);
+			}
+
+			if (token !== runToken) return;
+
+			const latency = Math.round(elapsed());
+			sourceMeta.textContent = `resolved in ${latency} ms`;
+
+			// Confidence jitter keeps repeat scans from looking pre-baked.
+			const resolved: WasteItem = {
+				...item,
+				confidence: Math.min(99.8, Math.max(82, item.confidence + (Math.random() - 0.5) * 1.2)),
+			};
+
+			renderPayload(resolved, latency);
+			setEngineState('resolved', 'resolved');
+			announcer.textContent = `${item.label} resolved as ${item.categoryLabel}. Route to ${item.sortDestination}.`;
+
+			if (!shouldRegister) return;
+
+			const unlocked = registerScan(resolved);
+			if (unlocked.length > 0) {
+				writeLine(
+					`<span class="text-accent">[!!]</span> <span class="text-ink">Achievement unlocked — ${unlocked
+						.map((badge) => badge.label)
+						.join(', ')}</span>`,
+				);
+			}
+			window.dispatchEvent(new CustomEvent('reuse:scan', { detail: resolved }));
+		}
+
+		function reject(message: string, fileName: string): void {
+			runToken += 1;
+			setEngineState('error', 'rejected');
+			sourceName.textContent = fileName;
+			sourceMeta.textContent = 'rejected';
+			previewFrame.classList.add('hidden');
+			busyState.classList.remove('hidden');
+			busyState.classList.add('flex');
+			idleState.classList.add('hidden');
+			writeLine(`<span class="text-cat-landfill">[!!]</span> <span class="text-ink">${message}</span>`);
+			announcer.textContent = message;
+		}
+
+		function ingest(file: File): void {
+			if (!file.type.startsWith('image/')) {
+				reject('Payload rejected — not an image stream.', file.name);
+				return;
+			}
+			if (file.size > MAX_BYTES) {
+				reject('Payload rejected — exceeds the 12 MB budget.', file.name);
+				return;
+			}
+
+			// Deterministic classification: hashing the name and size means the
+			// same file always resolves to the same material, as a real model would.
+			const hash = Array.from(file.name).reduce(
+				(acc, char) => (acc * 31 + char.charCodeAt(0)) % 9973,
+				file.size % 9973,
+			);
+			const item = WASTE_ITEMS[hash % WASTE_ITEMS.length];
+			objectUrl = URL.createObjectURL(file);
+
+			void runScan(item, {
+				name: file.name,
+				meta: `${file.type.replace('image/', '').toUpperCase()} · ${humanSize(file.size)}`,
+				url: objectUrl,
+			});
+		}
+
+		function humanSize(bytes: number): string {
+			return bytes >= 1_048_576
+				? `${(bytes / 1_048_576).toFixed(1)} MB`
+				: `${Math.max(1, Math.round(bytes / 1024))} KB`;
+		}
+
+		/* ---------------- Wiring ---------------- */
+
+		dropzone.addEventListener('click', () => fileInput.click());
+		dropzone.addEventListener('keydown', (event) => {
+			if (event.key === 'Enter' || event.key === ' ') {
+				event.preventDefault();
+				fileInput.click();
+			}
+		});
+
+		fileInput.addEventListener('change', () => {
+			const file = fileInput.files?.[0];
+			if (file) ingest(file);
+			fileInput.value = '';
+		});
+
+		dropzone.addEventListener('dragenter', (event) => {
+			event.preventDefault();
+			dropzone.classList.add('is-dragging');
+		});
+		dropzone.addEventListener('dragover', (event) => {
+			event.preventDefault();
+			dropzone.classList.add('is-dragging');
+		});
+		dropzone.addEventListener('dragleave', (event) => {
+			event.preventDefault();
+			if ((event as DragEvent).relatedTarget) return;
+			dropzone.classList.remove('is-dragging');
+		});
+		dropzone.addEventListener('drop', (event) => {
+			event.preventDefault();
+			dropzone.classList.remove('is-dragging');
+			const file = (event as DragEvent).dataTransfer?.files?.[0];
+			if (file) ingest(file);
+		});
+
+		quickKeys.forEach((key) => {
+			key.addEventListener('click', () => {
+				const item = WASTE_ITEMS.find((entry) => entry.id === key.dataset.quickKey);
+				if (item) {
+					void runScan(item, {
+						name: `demo://${item.id}`,
+						meta: 'demo source',
+						url: null,
+					});
+				}
+			});
+		});
+
+		viewButtons.forEach((button) => {
+			button.addEventListener('click', () => {
+				const mode = button.dataset.view;
+				viewButtons.forEach((peer) =>
+					peer.setAttribute('aria-pressed', String(peer === button)),
+				);
+				const isJson = mode === 'json';
+				viewFormatted.classList.toggle('hidden', isJson);
+				viewJson.classList.toggle('hidden', !isJson);
+				viewJson.classList.toggle('flex', isJson);
+			});
+		});
+
+		copyButton.addEventListener('click', async () => {
+			if (!payloadJson) return;
+			try {
+				await navigator.clipboard.writeText(payloadJson);
+				copyStatus.textContent = 'copied to clipboard';
+			} catch {
+				copyStatus.textContent = 'clipboard blocked — select the block instead';
+			}
+			window.setTimeout(() => {
+				copyStatus.textContent = '';
+			}, 2600);
+		});
+
+		clearButton.addEventListener('click', () => {
+			runToken += 1;
+			releasePreview();
+			previewFrame.classList.remove('hidden');
+			idleState.classList.remove('hidden');
+			busyState.classList.add('hidden');
+			busyState.classList.remove('flex');
+			resultEmpty.classList.remove('hidden');
+			resultShell.classList.add('hidden');
+			quickKeys.forEach((key) => key.setAttribute('aria-pressed', 'false'));
+			resetTerminal();
+			setEngineState('standby', 'standby');
+			announcer.textContent = 'Scanner reset. No active payload.';
+			window.dispatchEvent(new CustomEvent('reuse:reset'));
+		});
+
+		// Boot a demo scan so the panel is never an empty shell on first paint.
+		// It renders the payload but is not written to telemetry, so the seeded
+		// figures the user sees in the dashboard remain exactly the seed.
+		void runScan(
+			WASTE_ITEMS[0],
+			{ name: `demo://${WASTE_ITEMS[0].id}`, meta: 'demo source', url: null },
+			{ register: false },
+		);
+	}
+</script>

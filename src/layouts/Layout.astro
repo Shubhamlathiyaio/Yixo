@@ -1,23 +1,57 @@
+---
+import '../styles/globals.css';
+
+interface Props {
+	title: string;
+	description: string;
+}
+
+const { title, description } = Astro.props;
+---
+
 <!doctype html>
-<html lang="en">
+<html lang="en" class="scheme-dark">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Astro Basics</title>
+
+		<title>{title}</title>
+		<meta name="description" content={description} />
+		<link rel="canonical" href={Astro.url.href} />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:title" content={title} />
+		<meta property="og:description" content={description} />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={title} />
+		<meta name="twitter:description" content={description} />
+
+		<meta name="theme-color" content="#000000" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="alternate icon" href="/favicon.ico" />
+
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			rel="stylesheet"
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+		/>
+
+		<script is:inline>
+			// Flag script availability so reveal-on-scroll can opt in without
+			// hiding content when JavaScript is unavailable.
+			document.documentElement.classList.add('js');
+		</script>
 	</head>
-	<body>
+	<body class="min-h-screen bg-canvas text-body antialiased">
+		<a
+			href="#workspace"
+			class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-100 focus:rounded-md focus:border focus:border-line focus:bg-elevated focus:px-4 focus:py-2 focus:text-sm focus:text-ink"
+		>
+			Skip to workspace
+		</a>
+
 		<slot />
 	</body>
 </html>
-
-<style>
-	html,
-	body {
-		margin: 0;
-		width: 100%;
-		height: 100%;
-	}
-</style>

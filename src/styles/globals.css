@@ -1,0 +1,868 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   RE:WASTE AI — Design System
+   Stark monochrome, ink-on-black, single neon-green accent.
+   All primitives live in @theme so they emit first-class Tailwind utilities
+   (bg-canvas, text-mute, border-line, font-mono, rounded-md, ...).
+   ========================================================================== */
+
+@theme {
+	/* ---- Typeface stacks ------------------------------------------------ */
+	--font-sans: "Inter", "Geist", ui-sans-serif, system-ui, -apple-system,
+		"Segoe UI", Roboto, sans-serif;
+	--font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, "SFMono-Regular",
+		Menlo, Consolas, monospace;
+
+	/* ---- Greyscale ladder ----------------------------------------------- */
+	--color-canvas: #000000;
+	--color-surface: #0a0a0a;
+	--color-card: #111111;
+	--color-elevated: #171717;
+	--color-ink: #ffffff;
+	--color-body: #a1a1a1;
+	--color-mute: #737373;
+	--color-faint: #4d4d4d;
+
+	/* ---- Structure ------------------------------------------------------ */
+	--color-line: #262626;
+	--color-line-soft: #1c1c1c;
+	--color-line-strong: #333333;
+
+	/* ---- The one and only accent --------------------------------------- */
+	--color-accent: #00ff66;
+	--color-accent-dim: rgb(0 255 102 / 0.12);
+	--color-accent-faint: rgb(0 255 102 / 0.05);
+	--color-accent-line: rgb(0 255 102 / 0.3);
+
+	/* ---- Semantic material categories (indicator only, never fill) ----- */
+	--color-cat-recyclable: #00ff66;
+	--color-cat-organic: #4ade80;
+	--color-cat-landfill: #f87171;
+	--color-cat-ewaste: #fbbf24;
+	--color-cat-hazardous: #c084fc;
+
+	/* ---- Type scale (px + paired line-height / tracking) --------------- */
+	--text-2xs: 10px;
+	--text-2xs--line-height: 14px;
+	--text-2xs--letter-spacing: 0.1em;
+	--text-xs: 11px;
+	--text-xs--line-height: 16px;
+	--text-sm: 12px;
+	--text-sm--line-height: 18px;
+	--text-base: 13px;
+	--text-base--line-height: 20px;
+	--text-md: 14px;
+	--text-md--line-height: 20px;
+	--text-lg: 16px;
+	--text-lg--line-height: 24px;
+	--text-xl: 20px;
+	--text-xl--line-height: 28px;
+	--text-2xl: 24px;
+	--text-2xl--line-height: 32px;
+	--text-3xl: 30px;
+	--text-3xl--line-height: 36px;
+	--text-4xl: 38px;
+	--text-4xl--line-height: 44px;
+	--text-5xl: 48px;
+	--text-5xl--line-height: 52px;
+	--text-6xl: 64px;
+	--text-6xl--line-height: 68px;
+	--text-7xl: 80px;
+	--text-7xl--line-height: 80px;
+
+	/* ---- Radius (Vercel: tight, never pill except status dots) ---------- */
+	--radius-xs: 4px;
+	--radius-sm: 6px;
+	--radius-md: 8px;
+	--radius-lg: 12px;
+	--radius-xl: 16px;
+
+	/* ---- Motion --------------------------------------------------------- */
+	--animate-blink: blink 1.1s steps(1, end) infinite;
+	--animate-beat: beat 2.2s ease-in-out infinite;
+	--animate-sweep: sweep 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+	--animate-rise: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	--animate-fade: fade 0.3s ease-out forwards;
+	--animate-fill: fill 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	--animate-pulse-ring: pulse-ring 1.4s ease-out infinite;
+	--animate-shimmer: shimmer 2.4s linear infinite;
+
+	@keyframes blink {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0;
+		}
+	}
+
+	@keyframes beat {
+		0%,
+		100% {
+			opacity: 1;
+			transform: scale(1);
+		}
+		50% {
+			opacity: 0.35;
+			transform: scale(1.25);
+		}
+	}
+
+	@keyframes sweep {
+		0% {
+			transform: translateY(-8%);
+			opacity: 0;
+		}
+		12% {
+			opacity: 1;
+		}
+		88% {
+			opacity: 1;
+		}
+		100% {
+			transform: translateY(880%);
+			opacity: 0;
+		}
+	}
+
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+
+	@keyframes fill {
+		from {
+			width: 0%;
+		}
+	}
+
+	@keyframes pulse-ring {
+		0% {
+			box-shadow: 0 0 0 0 rgb(0 255 102 / 0.4);
+		}
+		70% {
+			box-shadow: 0 0 0 6px rgb(0 255 102 / 0);
+		}
+		100% {
+			box-shadow: 0 0 0 0 rgb(0 255 102 / 0);
+		}
+	}
+
+	@keyframes shimmer {
+		from {
+			background-position: -200% 0;
+		}
+		to {
+			background-position: 200% 0;
+		}
+	}
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+	*,
+	*::before,
+	*::after {
+		border-color: var(--color-line);
+	}
+
+	html {
+		scroll-behavior: smooth;
+		scroll-padding-top: 88px;
+		background-color: var(--color-canvas);
+		color-scheme: dark;
+	}
+
+	body {
+		background-color: var(--color-canvas);
+		color: var(--color-ink);
+		font-family: var(--font-sans);
+		font-size: var(--text-md);
+		line-height: var(--text-md--line-height);
+		-webkit-font-smoothing: antialiased;
+		-moz-osx-font-smoothing: grayscale;
+		font-feature-settings: "cv02", "cv03", "cv04", "ss01";
+		text-rendering: optimizeLegibility;
+	}
+
+	h1,
+	h2,
+	h3,
+	h4 {
+		font-weight: 600;
+		letter-spacing: -0.028em;
+		color: var(--color-ink);
+	}
+
+	::selection {
+		background-color: var(--color-accent);
+		color: var(--color-canvas);
+	}
+
+	:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: 2px;
+	}
+
+	/* Numeric telemetry must never jitter as values tick up. */
+	.tnum {
+		font-variant-numeric: tabular-nums;
+		font-feature-settings: "tnum";
+	}
+
+	/* Scrollbars: 6px, monochrome, no accent. */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: var(--color-line) transparent;
+	}
+
+	::-webkit-scrollbar {
+		width: 6px;
+		height: 6px;
+	}
+
+	::-webkit-scrollbar-track {
+		background: var(--color-canvas);
+	}
+
+	::-webkit-scrollbar-thumb {
+		background: var(--color-line);
+		border-radius: 3px;
+	}
+
+	::-webkit-scrollbar-thumb:hover {
+		background: var(--color-faint);
+	}
+}
+
+/* ==========================================================================
+   Components — global classes (JS toggles these, so they must NOT be scoped)
+   ========================================================================== */
+
+@layer components {
+	/* Micro label: the mono uppercase eyebrow used above every section. */
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: var(--text-2xs);
+		line-height: var(--text-2xs--line-height);
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--color-faint);
+	}
+
+	/* Primary surface: 1px hairline, level-0 elevation. */
+	.panel {
+		background-color: var(--color-card);
+		border: 1px solid var(--color-line);
+		border-radius: var(--radius-lg);
+		transition:
+			border-color 0.18s ease,
+			background-color 0.18s ease;
+	}
+
+	.panel:hover {
+		border-color: var(--color-line-strong);
+	}
+
+	/* Buttons ------------------------------------------------------------ */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		height: 36px;
+		padding-inline: 0.875rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-line);
+		background-color: transparent;
+		color: var(--color-ink);
+		font-family: var(--font-sans);
+		font-size: var(--text-base);
+		font-weight: 500;
+		white-space: nowrap;
+		cursor: pointer;
+		transition:
+			background-color 0.15s ease,
+			border-color 0.15s ease,
+			color 0.15s ease,
+			transform 0.08s ease;
+	}
+
+	.btn:hover {
+		background-color: var(--color-elevated);
+		border-color: var(--color-line-strong);
+		color: var(--color-ink);
+	}
+
+	.btn:active {
+		transform: scale(0.98);
+	}
+
+	.btn-primary {
+		background-color: var(--color-ink);
+		border-color: var(--color-ink);
+		color: var(--color-canvas);
+	}
+
+	.btn-primary:hover {
+		background-color: #e5e5e5;
+		border-color: #e5e5e5;
+		color: var(--color-canvas);
+	}
+
+	.btn-accent {
+		border-color: var(--color-accent-line);
+		color: var(--color-accent);
+	}
+
+	.btn-accent:hover {
+		background-color: var(--color-accent-dim);
+		border-color: var(--color-accent);
+		color: var(--color-accent);
+	}
+
+	.btn-sm {
+		height: 28px;
+		padding-inline: 0.625rem;
+		font-size: var(--text-sm);
+		font-weight: 500;
+	}
+
+	/* Form controls ------------------------------------------------------ */
+	.field {
+		height: 36px;
+		padding-inline: 0.75rem;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-line);
+		background-color: var(--color-surface);
+		color: var(--color-ink);
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		appearance: none;
+	}
+
+	.field:hover {
+		border-color: var(--color-line-strong);
+	}
+
+	/* Status dot --------------------------------------------------------- */
+	.dot {
+		display: inline-block;
+		width: 6px;
+		height: 6px;
+		border-radius: 9999px;
+		background-color: var(--color-faint);
+		flex-shrink: 0;
+	}
+
+	.dot-live {
+		background-color: var(--color-accent);
+		box-shadow: 0 0 8px rgb(0 255 102 / 0.5);
+	}
+
+	.dot-pulse {
+		background-color: var(--color-accent);
+		animation: var(--animate-beat);
+	}
+
+	/* Grid backdrop: 64px hairline lattice, fades out toward the edges. */
+	.lattice {
+		background-image:
+			linear-gradient(to right, var(--color-line-soft) 1px, transparent 1px),
+			linear-gradient(to bottom, var(--color-line-soft) 1px, transparent 1px);
+		background-size: 64px 64px;
+		-webkit-mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 20%, transparent 78%);
+		mask-image: radial-gradient(ellipse 70% 55% at 50% 0%, #000 20%, transparent 78%);
+	}
+
+	/* Accent text glow — reserved for confirmed positive results. */
+	.glow {
+		text-shadow: 0 0 24px rgb(0 255 102 / 0.35);
+	}
+
+	/* Material category tag. Colour arrives per-instance via --tag-color, so
+	   one class covers all five streams without dynamic class concatenation. */
+	.cat-tag {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.1875rem 0.5rem 0.1875rem 0.4375rem;
+		border-radius: 9999px;
+		border: 1px solid color-mix(in srgb, var(--tag-color) 32%, transparent);
+		background-color: color-mix(in srgb, var(--tag-color) 10%, transparent);
+		color: var(--tag-color);
+		font-family: var(--font-mono);
+		font-size: var(--text-2xs);
+		line-height: var(--text-2xs--line-height);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		white-space: nowrap;
+	}
+
+	.cat-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 9999px;
+		background-color: var(--tag-color);
+		flex-shrink: 0;
+	}
+
+	/* Raw payload viewer */
+	.json-view {
+		border: 1px solid var(--color-line);
+		border-radius: var(--radius-md);
+		background-color: var(--color-canvas);
+		font-family: var(--font-mono);
+		font-size: var(--text-sm);
+		line-height: 1.65;
+		overflow-x: auto;
+		padding: 1rem;
+		tab-size: 2;
+	}
+
+	.json-key {
+		color: var(--color-ink);
+	}
+
+	.json-str {
+		color: var(--color-accent);
+	}
+
+	.json-num {
+		color: #d4d4d4;
+	}
+
+	.json-bool {
+		color: #a3a3a3;
+	}
+
+	/* Replayable entrance for panels that swap content in place. */
+	[data-fresh] {
+		animation: var(--animate-rise);
+	}
+
+	/* Skeleton shimmer for pending telemetry rows. */
+	.skeleton {
+		background-image: linear-gradient(
+			90deg,
+			var(--color-elevated) 0%,
+			#1f1f1f 50%,
+			var(--color-elevated) 100%
+		);
+		background-size: 200% 100%;
+		animation: var(--animate-shimmer);
+	}
+}
+
+/* ==========================================================================
+   Scanner-specific global classes
+   (toggled by the client engine, therefore unscoped)
+   ========================================================================== */
+
+.dropzone {
+	border: 1px dashed var(--color-line);
+	background-color: var(--color-surface);
+	transition:
+		border-color 0.2s ease,
+		background-color 0.2s ease;
+}
+
+.dropzone:hover,
+.dropzone.is-dragging {
+	border-color: var(--color-accent);
+	background-color: var(--color-accent-faint);
+}
+
+.dropzone.is-dragging .dropzone-hint {
+	color: var(--color-accent);
+}
+
+.quickkey {
+	border: 1px solid var(--color-line);
+	background-color: var(--color-card);
+	border-radius: var(--radius-md);
+	cursor: pointer;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease,
+		transform 0.08s ease;
+}
+
+.quickkey:hover {
+	border-color: var(--color-line-strong);
+	background-color: var(--color-elevated);
+}
+
+.quickkey:active {
+	transform: scale(0.97);
+}
+
+.quickkey[aria-pressed="true"] {
+	border-color: var(--color-accent-line);
+	background-color: var(--color-accent-faint);
+}
+
+.quickkey[aria-pressed="true"] .quickkey-code {
+	color: var(--color-accent);
+}
+
+.term-line {
+	animation: var(--animate-rise);
+}
+
+.cursor-block {
+	display: inline-block;
+	width: 6px;
+	height: 12px;
+	vertical-align: -1px;
+	background-color: var(--color-accent);
+	animation: var(--animate-blink);
+}
+
+.sweep-line {
+	position: absolute;
+	inset-inline: 0;
+	top: 0;
+	height: 2px;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		var(--color-accent),
+		transparent
+	);
+	animation: var(--animate-sweep);
+}
+
+/* Checklist rows ------------------------------------------------------- */
+.challenge {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.75rem;
+	padding: 0.75rem;
+	border: 1px solid var(--color-line-soft);
+	border-radius: var(--radius-md);
+	cursor: pointer;
+	transition:
+		border-color 0.15s ease,
+		background-color 0.15s ease;
+}
+
+.challenge:hover {
+	border-color: var(--color-line-strong);
+	background-color: var(--color-surface);
+}
+
+.challenge[aria-checked="true"] {
+	border-color: var(--color-accent-line);
+	background-color: var(--color-accent-faint);
+}
+
+.challenge-box {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 16px;
+	height: 16px;
+	margin-top: 2px;
+	border: 1px solid var(--color-line-strong);
+	border-radius: var(--radius-xs);
+	background-color: var(--color-surface);
+	flex-shrink: 0;
+	transition:
+		background-color 0.15s ease,
+		border-color 0.15s ease;
+}
+
+.challenge:hover .challenge-box {
+	border-color: var(--color-faint);
+}
+
+.challenge[aria-checked="true"] .challenge-box {
+	background-color: var(--color-accent);
+	border-color: var(--color-accent);
+}
+
+.challenge-box svg {
+	opacity: 0;
+	transform: scale(0.6);
+	transition:
+		opacity 0.15s ease,
+		transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.challenge[aria-checked="true"] .challenge-box svg {
+	opacity: 1;
+	transform: scale(1);
+}
+
+.challenge-title {
+	font-size: var(--text-md);
+	line-height: var(--text-md--line-height);
+	font-weight: 500;
+	color: var(--color-ink);
+	transition: color 0.15s ease;
+}
+
+.challenge[aria-checked="true"] .challenge-title {
+	text-decoration: line-through;
+	text-decoration-color: var(--color-accent-line);
+	text-decoration-thickness: 1px;
+	color: var(--color-mute);
+}
+
+/* Achievement badges --------------------------------------------------- */
+.badge {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding: 0.875rem;
+	border: 1px solid var(--color-line);
+	border-radius: var(--radius-md);
+	background-color: var(--color-card);
+	transition:
+		border-color 0.2s ease,
+		background-color 0.2s ease;
+}
+
+.badge[data-unlocked="false"] {
+	background-color: transparent;
+}
+
+.badge[data-unlocked="true"] {
+	border-color: var(--color-accent-line);
+	background-color: var(--color-accent-faint);
+}
+
+.badge[data-unlocked="true"] .badge-glyph {
+	color: var(--color-accent);
+	border-color: var(--color-accent-line);
+	background-color: rgb(0 255 102 / 0.08);
+}
+
+.badge[data-unlocked="true"]:hover {
+	border-color: var(--color-accent);
+}
+
+.badge[data-unlocked="false"]:hover {
+	border-color: var(--color-line-strong);
+}
+
+.badge[data-just-unlocked="true"] {
+	animation: var(--animate-pulse-ring);
+}
+
+.badge-glyph {
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	border: 1px solid var(--color-line);
+	border-radius: var(--radius-sm);
+	background-color: var(--color-surface);
+	color: var(--color-faint);
+	font-family: var(--font-mono);
+	font-size: var(--text-2xs);
+	letter-spacing: 0.04em;
+	transition:
+		color 0.2s ease,
+		border-color 0.2s ease,
+		background-color 0.2s ease;
+}
+
+/* Bin capacity selector ------------------------------------------------ */
+.bin-tab {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.5rem 0.625rem;
+	border: 1px solid var(--color-line);
+	border-radius: var(--radius-md);
+	background-color: transparent;
+	color: var(--color-mute);
+	font-family: var(--font-mono);
+	font-size: var(--text-sm);
+	cursor: pointer;
+	white-space: nowrap;
+	transition:
+		color 0.15s ease,
+		border-color 0.15s ease,
+		background-color 0.15s ease;
+}
+
+.bin-tab:hover {
+	color: var(--color-ink);
+	border-color: var(--color-line-strong);
+	background-color: var(--color-surface);
+}
+
+.bin-tab[aria-selected="true"] {
+	color: var(--color-ink);
+	border-color: var(--color-line-strong);
+	background-color: var(--color-elevated);
+}
+
+.bin-swatch {
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	flex-shrink: 0;
+}
+
+.meter {
+	height: 4px;
+	border-radius: 2px;
+	background-color: var(--color-line);
+	overflow: hidden;
+}
+
+.meter-fill {
+	height: 100%;
+	width: 0%;
+	border-radius: 2px;
+	transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Charts --------------------------------------------------------------- */
+.bar-track {
+	display: flex;
+	align-items: flex-end;
+	gap: 3px;
+	height: 44px;
+}
+
+.bar {
+	flex: 1;
+	min-height: 2px;
+	border-radius: 1px 1px 0 0;
+	background-color: var(--color-line);
+	transform-origin: bottom;
+	transition:
+		height 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+		background-color 0.2s ease;
+}
+
+.bar[data-peak="true"] {
+	background-color: var(--color-accent);
+}
+
+.bar:hover {
+	background-color: var(--color-faint);
+}
+
+.bar[data-peak="true"]:hover {
+	background-color: var(--color-accent);
+}
+
+.cat-row:hover .cat-fill {
+	filter: brightness(1.35);
+}
+
+.cat-fill {
+	height: 100%;
+	border-radius: 0 2px 2px 0;
+	transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Sidebar nav ---------------------------------------------------------- */
+.navlink {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 0.625rem;
+	padding: 0.4375rem 0.625rem;
+	border-radius: var(--radius-sm);
+	color: var(--color-mute);
+	font-size: var(--text-base);
+	font-weight: 500;
+	transition:
+		color 0.15s ease,
+		background-color 0.15s ease;
+}
+
+.navlink:hover {
+	color: var(--color-ink);
+	background-color: var(--color-elevated);
+}
+
+.navlink[aria-current="true"] {
+	color: var(--color-ink);
+	background-color: var(--color-elevated);
+}
+
+.navlink[aria-current="true"]::before {
+	content: "";
+	position: absolute;
+	left: -0.625rem;
+	top: 50%;
+	width: 2px;
+	height: 14px;
+	margin-top: -7px;
+	border-radius: 1px;
+	background-color: var(--color-accent);
+}
+
+/* Reveal-on-scroll utility (progressive enhancement, no JS dependency) */
+.reveal {
+	opacity: 1;
+	transform: none;
+}
+
+.js .reveal {
+	opacity: 0;
+	transform: translateY(12px);
+}
+
+.js .reveal.is-in {
+	animation: var(--animate-rise) forwards;
+}
+
+/* ==========================================================================
+   Motion & contrast preferences
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	.js .reveal {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (prefers-contrast: more) {
+	:root {
+		--color-line: #ffffff;
+		--color-body: #e5e5e5;
+		--color-mute: #d4d4d4;
+		--color-faint: #a3a3a3;
+	}
+}

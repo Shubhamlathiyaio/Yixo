@@ -1,0 +1,842 @@
+---
+/**
+ * Component B — Live Telemetry Analytics, and Component C — Gamified
+ * Infrastructure (challenges, bin capacity guidance, achievements).
+ *
+ * Every number is derived from the shared telemetry store, so a completed scan
+ * or a ticked challenge immediately propagates across the whole dashboard.
+ */
+
+import {
+	ACHIEVEMENTS,
+	BINS,
+	CATEGORY_META,
+	CATEGORY_ORDER,
+	CHALLENGES,
+	DAY_LABELS,
+	DIVERSION_TREND,
+	SEED_TELEMETRY,
+	THROUGHPUT_TREND,
+	type Achievement,
+	type Category,
+} from '../data/recycle';
+
+const seedDerived = {
+	items: SEED_TELEMETRY.itemsProcessed,
+	landfill: SEED_TELEMETRY.landfill,
+	carbon: SEED_TELEMETRY.carbonSaved,
+	diversion: (SEED_TELEMETRY.itemsProcessed - SEED_TELEMETRY.landfill) /
+		SEED_TELEMETRY.itemsProcessed,
+	streak: SEED_TELEMETRY.streak,
+	points: SEED_TELEMETRY.points,
+	recycled:
+		SEED_TELEMETRY.categoryCounts.recyclable +
+		SEED_TELEMETRY.categoryCounts.organic +
+		SEED_TELEMETRY.categoryCounts['e-waste'] +
+		SEED_TELEMETRY.categoryCounts.hazardous,
+	completed: Object.values(SEED_TELEMETRY.challenges).filter(Boolean).length,
+};
+
+const completedSeed = seedDerived.completed;
+const activeSeed = CHALLENGES.length - completedSeed;
+
+/* ---- Seeded badge evaluation (mirrors telemetry.achievementValue) -------- */
+
+function seedValue(achievement: Achievement): number {
+	const counts = SEED_TELEMETRY.categoryCounts;
+	switch (achievement.metric) {
+		case 'recyclable':
+			return counts.recyclable;
+		case 'organic':
+			return counts.organic;
+		case 'eWaste':
+			return counts['e-waste'];
+		case 'hazardous':
+			return counts.hazardous;
+		case 'itemsProcessed':
+			return seedDerived.items;
+		case 'diversionRate':
+			return seedDerived.diversion * 100;
+		case 'carbonSaved':
+			return seedDerived.carbon;
+		case 'streak':
+			return seedDerived.streak;
+		case 'points':
+			return seedDerived.points;
+	}
+}
+
+function formatValue(value: number, unit: Achievement['unit']): string {
+	if (unit === 'percent') return `${value.toFixed(1)}%`;
+	if (unit === 'kg') return value.toFixed(1);
+	return value.toLocaleString('en-US');
+}
+
+/* ---- Charts, generated as inline SVG / CSS bars (zero chart libraries) -- */
+
+const SPARK_W = 260;
+const SPARK_H = 48;
+const sparkMin = Math.min(...DIVERSION_TREND) - 1.5;
+const sparkMax = Math.max(...DIVERSION_TREND) + 0.5;
+const sparkPoints = DIVERSION_TREND.map((value, index) => {
+	const x = (index / (DIVERSION_TREND.length - 1)) * SPARK_W;
+	const y = SPARK_H - ((value - sparkMin) / (sparkMax - sparkMin)) * SPARK_H;
+	return { x, y, value };
+});
+const sparkLine = sparkPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+const sparkArea = `M 0 ${SPARK_H} L ${sparkPoints
+	.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+	.join(' L ')} L ${SPARK_W} ${SPARK_H} Z`;
+const lastPoint = sparkPoints[sparkPoints.length - 1];
+
+const throughputMax = Math.max(...THROUGHPUT_TREND);
+const throughputTail = THROUGHPUT_TREND.slice(-7);
+const throughputLabels = DAY_LABELS;
+
+const totalCategory = CATEGORY_ORDER.reduce(
+	(sum, key) => sum + SEED_TELEMETRY.categoryCounts[key],
+	0,
+);
+---
+
+<div id="dashboard" class="flex flex-col gap-4 lg:gap-5">
+	<!-- ==================== KPI row ==================== -->
+	<section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Live telemetry">
+		<!-- Items processed -->
+		<article class="panel p-5">
+			<div class="flex items-start justify-between gap-3">
+				<p class="eyebrow">items.processed</p>
+				<span class="dot" data-kpi-dot="items" aria-hidden="true"></span>
+			</div>
+			<p class="tnum mt-3 font-mono text-3xl font-medium text-ink" data-kpi="items">
+				{seedDerived.items.toLocaleString('en-US')}
+			</p>
+			<p class="mt-1.5 font-mono text-2xs text-faint">
+				+{THROUGHPUT_TREND.at(-1)} today · 42 day avg
+			</p>
+			<div class="mt-4 flex h-6 items-end gap-[3px]" aria-hidden="true">
+				{
+					THROUGHPUT_TREND.slice(-14).map((value) => (
+						<span
+							class="bar"
+							style={`height:${Math.max(8, (value / throughputMax) * 100)}%`}
+						/>
+					))
+				}
+			</div>
+		</article>
+
+		<!-- Diversion rate -->
+		<article class="panel p-5">
+			<div class="flex items-start justify-between gap-3">
+				<p class="eyebrow">diverted.from.landfill</p>
+				<span class="dot" data-kpi-dot="diversion" aria-hidden="true"></span>
+			</div>
+			<p class="tnum mt-3 font-mono text-3xl font-medium text-accent" data-kpi="diversion">
+				{(seedDerived.diversion * 100).toFixed(1)}%
+			</p>
+			<p class="mt-1.5 font-mono text-2xs text-faint">
+				+{(DIVERSION_TREND.at(-1)! - DIVERSION_TREND[0]).toFixed(1)} pts over 7 days
+			</p>
+			<div class="mt-4 h-6">
+				<svg
+					viewBox={`0 0 ${SPARK_W} ${SPARK_H}`}
+					preserveAspectRatio="none"
+					class="h-full w-full"
+					role="img"
+					aria-label={`Diversion rate trend, ${DIVERSION_TREND.join(', ')} percent`}
+				>
+					<defs>
+						<linearGradient id="sparkFill" x1="0" y1="0" x2="0" y2="1">
+							<stop offset="0%" stop-color="#00ff66" stop-opacity="0.22"></stop>
+							<stop offset="100%" stop-color="#00ff66" stop-opacity="0"></stop>
+						</linearGradient>
+					</defs>
+					<path d={sparkArea} fill="url(#sparkFill)"></path>
+					<polyline
+						points={sparkLine}
+						fill="none"
+						stroke="#00ff66"
+						stroke-width="1.5"
+						vector-effect="non-scaling-stroke"></polyline>
+					<circle cx={lastPoint.x} cy={lastPoint.y} r="2.5" fill="#00ff66"></circle>
+				</svg>
+			</div>
+		</article>
+
+		<!-- Carbon saved -->
+		<article class="panel p-5">
+			<div class="flex items-start justify-between gap-3">
+				<p class="eyebrow">carbon.avoided</p>
+				<span class="dot" data-kpi-dot="carbon" aria-hidden="true"></span>
+			</div>
+			<p class="glow tnum mt-3 font-mono text-3xl font-medium text-accent" data-kpi="carbon">
+				{seedDerived.carbon.toFixed(1)}
+				<span class="text-lg text-body"> kg</span>
+			</p>
+			<p class="mt-1.5 font-mono text-2xs text-faint" data-kpi="carbon-alt">
+				≈ 612 passenger miles avoided
+			</p>
+			<div class="mt-4 h-6">
+				<svg
+					viewBox="0 0 100 24"
+					preserveAspectRatio="none"
+					class="h-full w-full"
+					role="img"
+					aria-label="Cumulative carbon avoidance curve, flattening as the campaign matures"
+				>
+					<path
+						d="M 0 24 C 12 21, 22 18, 34 15 S 58 9, 70 6 S 88 2.5, 100 0"
+						fill="none"
+						stroke="#00ff66"
+						stroke-opacity="0.55"
+						stroke-width="1.5"
+						vector-effect="non-scaling-stroke"></path>
+				</svg>
+			</div>
+		</article>
+
+		<!-- Streak + points -->
+		<article class="panel p-5">
+			<div class="flex items-start justify-between gap-3">
+				<p class="eyebrow">active.streak</p>
+				<span class="dot" data-kpi-dot="streak" aria-hidden="true"></span>
+			</div>
+			<p class="tnum mt-3 font-mono text-3xl font-medium text-ink" data-kpi="streak">
+				{seedDerived.streak}
+				<span class="text-lg text-body"> days</span>
+			</p>
+			<p class="mt-1.5 font-mono text-2xs text-faint">
+				<span data-kpi="points">{seedDerived.points.toLocaleString('en-US')}</span> pts · top 8% of
+				Ward 14
+			</p>
+			<div class="mt-4 flex items-center gap-1" aria-hidden="true">
+				{
+					Array.from({ length: 14 }).map((_, index) => (
+						<span
+							class:list={[
+								'h-1 flex-1 rounded-full',
+								index < 12 ? 'bg-accent' : 'bg-line',
+							]}
+							data-streak-day={index < 12 ? 'on' : 'off'}
+						/>
+					))
+				}
+			</div>
+		</article>
+	</section>
+
+	<!-- ==================== Analytics + Challenges ==================== -->
+	<div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-5">
+		<!-- Stream distribution -->
+		<section class="panel p-5 xl:col-span-2" aria-labelledby="streams-title">
+			<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+				<div>
+					<p class="eyebrow">material.stream.distribution</p>
+					<h3 id="streams-title" class="mt-1 text-md font-semibold tracking-tight text-ink">
+						{seedDerived.recycled.toLocaleString('en-US')} of {seedDerived.items.toLocaleString('en-US')}
+						items recovered
+					</h3>
+				</div>
+				<span class="font-mono text-2xs tracking-[0.1em] text-faint uppercase">lifetime</span>
+			</div>
+
+			<ul class="flex flex-col gap-3.5" data-streams>
+				{
+					CATEGORY_ORDER.map((key: Category) => {
+						const meta = CATEGORY_META[key];
+						const count = SEED_TELEMETRY.categoryCounts[key];
+						const share = count / totalCategory;
+						return (
+							<li class="cat-row" data-stream={key}>
+								<div class="mb-1.5 flex items-baseline justify-between gap-3">
+									<span class="flex items-center gap-2 text-sm text-ink">
+										<span
+											class="h-2 w-2 rounded-[2px]"
+											style={`background:${meta.hex}`}
+											aria-hidden="true"
+										/>
+										{meta.label}
+									</span>
+									<span class="tnum font-mono text-2xs text-mute">
+										<span data-stream-count={key}>{count.toLocaleString('en-US')}</span>
+										· <span data-stream-share={key}>{(share * 100).toFixed(1)}%</span>
+									</span>
+								</div>
+								<div class="h-1.5 w-full overflow-hidden rounded-full bg-line">
+									<span
+										class="cat-fill block"
+										data-stream-bar={key}
+										style={`width:${(share * 100).toFixed(2)}%;background:${meta.hex}`}
+									/>
+								</div>
+							</li>
+						);
+					})
+				}
+			</ul>
+		</section>
+
+		<!-- Throughput -->
+		<section class="panel p-5" aria-labelledby="throughput-title">
+			<div class="mb-5 flex items-start justify-between gap-3">
+				<div>
+					<p class="eyebrow">throughput / 7d</p>
+					<h3 id="throughput-title" class="tnum mt-1 font-mono text-md text-ink">
+						{throughputTail.reduce((a, b) => a + b, 0)} items
+					</h3>
+				</div>
+				<span class="font-mono text-2xs text-faint">peak {throughputMax}</span>
+			</div>
+			<div class="bar-track" role="img" aria-label="Items processed per day across the last seven days">
+				{
+					throughputTail.map((value, index) => (
+						<span
+							class="bar"
+							data-peak={String(value === throughputMax)}
+							style={`height:${Math.max(6, (value / throughputMax) * 100)}%`}
+							title={`${throughputLabels[index]} — ${value} items`}
+						/>
+					))
+				}
+			</div>
+			<div class="mt-2 flex gap-[3px]" aria-hidden="true">
+				{
+					throughputTail.map((value, index) => (
+						<span class="flex-1 text-center font-mono text-2xs text-faint">
+							{throughputLabels[index]}
+						</span>
+					))
+				}
+			</div>
+			<dl class="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-line bg-line">
+				<div class="bg-card px-3 py-2.5">
+					<dt class="eyebrow">peak day</dt>
+					<dd class="tnum mt-1 font-mono text-sm text-ink">{throughputMax} items</dd>
+				</div>
+				<div class="bg-card px-3 py-2.5">
+					<dt class="eyebrow">mean</dt>
+					<dd class="tnum mt-1 font-mono text-sm text-ink">
+						{Math.round(throughputTail.reduce((a, b) => a + b, 0) / throughputTail.length)}
+					</dd>
+				</div>
+			</dl>
+		</section>
+	</div>
+
+	<!-- ==================== Challenges ==================== -->
+	<section
+		id="challenges"
+		class="panel scroll-mt-28 p-5"
+		aria-labelledby="challenges-title"
+	>
+		<div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+			<div>
+				<p class="eyebrow">gamified.infrastructure / challenges</p>
+				<h3 id="challenges-title" class="mt-1 text-lg font-semibold tracking-tight text-ink">
+					Eco-Challenges
+				</h3>
+			</div>
+			<div class="flex items-center gap-4 font-mono text-2xs text-mute">
+				<span><span class="text-accent" data-challenge-active>{activeSeed}</span> active</span>
+				<span class="h-3 w-px bg-line" aria-hidden="true"></span>
+				<span><span class="text-ink" data-challenge-done>{completedSeed}</span> done</span>
+				<span class="h-3 w-px bg-line" aria-hidden="true"></span>
+				<span class="text-ink" data-challenge-points>{seedDerived.points.toLocaleString('en-US')} pts</span>
+			</div>
+		</div>
+
+		<ul class="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+			{
+				CHALLENGES.map((challenge) => {
+					const done = Boolean(SEED_TELEMETRY.challenges[challenge.id]);
+					const meta = CATEGORY_META[challenge.category];
+					return (
+						<li>
+							<button
+								type="button"
+								class="challenge w-full text-left"
+								role="checkbox"
+								aria-checked={String(done)}
+								data-challenge={challenge.id}
+							>
+								<span class="challenge-box" aria-hidden="true">
+									<svg
+										width="10"
+										height="10"
+										viewBox="0 0 12 12"
+										fill="none"
+										stroke="#000000"
+										stroke-width="2.4"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<polyline points="1.5,6.5 4.5,9.5 10.5,2.5" />
+									</svg>
+								</span>
+								<span class="min-w-0 flex-1">
+									<span class="flex items-center gap-2">
+										<span class="challenge-title">{challenge.label}</span>
+										{challenge.streak && (
+											<span
+												class="shrink-0 rounded-xs border border-line px-1 py-px font-mono text-2xs tracking-[0.1em] text-faint uppercase"
+												title="Repeating challenge — advances the streak counter"
+											>
+												streak
+											</span>
+										)}
+									</span>
+									<span class="mt-1 block text-sm text-mute">{challenge.description}</span>
+									<span class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-2xs">
+										<span class="flex items-center gap-1.5 text-mute">
+											<span
+												class="h-1.5 w-1.5 rounded-full"
+												style={`background:${meta.hex}`}
+												aria-hidden="true"
+											/>
+											+{challenge.impact.itemsDiverted} items
+										</span>
+										<span class="text-mute">-{challenge.impact.carbonKg.toFixed(1)} kg CO₂</span>
+										<span class="text-accent">+{challenge.points} pts</span>
+									</span>
+								</span>
+							</button>
+						</li>
+					);
+				})
+			}
+		</ul>
+	</section>
+
+	<!-- ==================== Bins + Achievements ==================== -->
+	<div class="grid grid-cols-1 gap-4 xl:grid-cols-3 xl:gap-5">
+		<!-- Smart Bin Capacity Guidance -->
+		<section id="bins" class="panel scroll-mt-28 p-5 xl:col-span-2" aria-labelledby="bins-title">
+			<div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+				<div>
+					<p class="eyebrow">smart.bin.capacity / ward 14</p>
+					<h3 id="bins-title" class="mt-1 text-lg font-semibold tracking-tight text-ink">
+						Local Sorting Guidelines
+					</h3>
+				</div>
+				<span class="font-mono text-2xs text-faint">5 streams monitored</span>
+			</div>
+
+			<div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist" aria-label="Waste streams" data-bin-tabs>
+				{
+					BINS.map((bin, index) => (
+						<button
+							type="button"
+							class="bin-tab"
+							role="tab"
+							id={`bin-tab-${bin.id}`}
+							aria-selected={String(index === 0)}
+							aria-controls={`bin-panel-${bin.id}`}
+							tabindex={index === 0 ? '0' : '-1'}
+							data-bin-tab={bin.id}
+						>
+							<span class="bin-swatch" style={`background:${bin.swatch}`} aria-hidden="true" />
+							{bin.shortLabel}
+							<span class="tnum text-faint">{bin.capacityPct}%</span>
+						</button>
+					))
+				}
+			</div>
+
+			{
+				BINS.map((bin, index) => (
+					<div
+						class:list={['mt-4', index === 0 ? 'block' : 'hidden']}
+						role="tabpanel"
+						id={`bin-panel-${bin.id}`}
+						aria-labelledby={`bin-tab-${bin.id}`}
+						data-bin-panel={bin.id}
+						tabindex="0"
+					>
+						<div class="rounded-md border border-line bg-surface p-4">
+							<div class="flex flex-wrap items-start justify-between gap-3">
+								<div>
+									<p class="text-md font-semibold tracking-tight text-ink">{bin.label}</p>
+									<p class="mt-0.5 font-mono text-2xs text-faint">{bin.pathway}</p>
+								</div>
+								<div class="text-right">
+									<p class="tnum font-mono text-xl text-ink">
+										{bin.capacityPct}
+										<span class="text-sm text-mute">%</span>
+									</p>
+									<p class="font-mono text-2xs tracking-[0.1em] text-faint uppercase">fill</p>
+								</div>
+							</div>
+
+							<div class="mt-3 h-1 w-full overflow-hidden rounded-full bg-line">
+								<span
+									class="meter-fill block"
+									data-meter={bin.id}
+									style={`background:${bin.swatch};width:${bin.capacityPct}%`}
+								/>
+							</div>
+
+							<div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+								<div>
+									<p class="eyebrow mb-2">accept</p>
+									<ul class="flex flex-col gap-1.5">
+										{bin.accept.map((line) => (
+											<li class="flex gap-2 text-sm text-body">
+												<svg
+													width="12"
+													height="12"
+													viewBox="0 0 12 12"
+													fill="none"
+													stroke={bin.swatch}
+													stroke-width="2"
+													stroke-linecap="round"
+													stroke-linejoin="round"
+													class="mt-1 shrink-0"
+													aria-hidden="true"
+												>
+													<polyline points="1.5,6.5 4.5,9.5 10.5,2.5" />
+												</svg>
+												{line}
+											</li>
+										))}
+									</ul>
+								</div>
+								<div>
+									<p class="eyebrow mb-2">reject</p>
+									<ul class="flex flex-col gap-1.5">
+										{bin.reject.map((line) => (
+											<li class="flex gap-2 text-sm text-mute">
+												<svg
+													width="12"
+													height="12"
+													viewBox="0 0 12 12"
+													fill="none"
+													stroke="currentColor"
+													stroke-width="2"
+													stroke-linecap="round"
+													class="mt-1 shrink-0"
+													aria-hidden="true"
+												>
+													<line x1="2" y1="2" x2="10" y2="10" />
+													<line x1="10" y1="2" x2="2" y2="10" />
+												</svg>
+												{line}
+											</li>
+										))}
+									</ul>
+								</div>
+							</div>
+
+							<p class="mt-4 border-t border-line-soft pt-3 font-mono text-2xs text-mute">
+								<span class="text-faint">note</span> {bin.note}
+							</p>
+						</div>
+					</div>
+				))
+			}
+		</section>
+
+		<!-- Achievements -->
+		<section
+			id="badges"
+			class="panel scroll-mt-28 p-5"
+			aria-labelledby="achievements-title"
+		>
+
+			<div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+				<div>
+					<p class="eyebrow">system.achievements</p>
+					<h3 id="achievements-title" class="mt-1 text-lg font-semibold tracking-tight text-ink">
+						Badge Matrix
+					</h3>
+				</div>
+				<p class="font-mono text-2xs text-mute">
+					<span class="text-accent" data-badge-unlocked>
+						{ACHIEVEMENTS.filter((badge) => seedValue(badge) >= badge.threshold).length}
+					</span>
+					/
+					{ACHIEVEMENTS.length} unlocked
+				</p>
+			</div>
+
+			<ul class="grid grid-cols-1 gap-2 sm:grid-cols-2" data-badges>
+				{
+					ACHIEVEMENTS.map((badge) => {
+						const value = seedValue(badge);
+						const unlocked = value >= badge.threshold;
+						const progress = Math.min(100, (value / badge.threshold) * 100);
+						return (
+							<li>
+								<article
+									class="badge h-full"
+									data-badge={badge.id}
+									data-unlocked={String(unlocked)}
+									title={`${badge.label} — ${formatValue(value, badge.unit)} of ${formatValue(badge.threshold, badge.unit)}`}
+								>
+									<div class="flex items-center gap-2.5">
+										<span class="badge-glyph" aria-hidden="true">
+											{badge.glyph}
+										</span>
+										<div class="min-w-0">
+											<h4 class="truncate text-sm font-medium text-ink">{badge.label}</h4>
+											<p class="font-mono text-2xs text-faint">
+												{unlocked ? 'unlocked' : `${progress.toFixed(0)}% complete`}
+											</p>
+										</div>
+									</div>
+									<p class="text-2xs leading-[1.5] text-mute">{badge.description}</p>
+									<div class="mt-auto">
+										<div class="meter">
+											<span
+												class="meter-fill block"
+												data-badge-meter={badge.id}
+												style={`width:${progress.toFixed(1)}%;background:${
+													unlocked ? 'var(--color-accent)' : 'var(--color-faint)'
+												}`}
+											/>
+										</div>
+										<p class="tnum mt-1.5 font-mono text-2xs text-faint">
+											<span data-badge-value={badge.id}>
+												{formatValue(value, badge.unit)}
+											</span>
+											/
+											{formatValue(badge.threshold, badge.unit)}
+										</p>
+									</div>
+								</article>
+							</li>
+						);
+					})
+				}
+			</ul>
+		</section>
+	</div>
+</div>
+
+<script>
+	import { ACHIEVEMENTS, CATEGORY_META, CATEGORY_ORDER, CHALLENGES } from '../data/recycle';
+	import {
+		achievementValue,
+		derive,
+		fmt,
+		getState,
+		isUnlocked,
+		resetSession,
+		subscribe,
+		toggleChallenge,
+	} from '../lib/telemetry';
+
+	const root = document.getElementById('dashboard') as HTMLElement | null;
+
+	if (root) {
+		const pick = <T extends Element>(selector: string): T => root.querySelector(selector) as T;
+		const pickAll = <T extends Element>(selector: string): T[] =>
+			Array.from(root.querySelectorAll<T>(selector));
+
+		const kpi = {
+			items: pick('[data-kpi="items"]'),
+			diversion: pick('[data-kpi="diversion"]'),
+			carbon: pick('[data-kpi="carbon"]'),
+			carbonAlt: pick('[data-kpi="carbon-alt"]'),
+			streak: pick('[data-kpi="streak"]'),
+			points: pick('[data-kpi="points"]'),
+		};
+		const dots = {
+			items: pick('[data-kpi-dot="items"]'),
+			diversion: pick('[data-kpi-dot="diversion"]'),
+			carbon: pick('[data-kpi-dot="carbon"]'),
+			streak: pick('[data-kpi-dot="streak"]'),
+		};
+
+		const challengeActive = pick('[data-challenge-active]');
+		const challengeDone = pick('[data-challenge-done]');
+		const challengePoints = pick('[data-challenge-points]');
+		const challengeNodes = pickAll<HTMLButtonElement>('[data-challenge]');
+		const streakDays = pickAll('[data-streak-day]');
+		const streamCounts = new Map(
+			CATEGORY_ORDER.map((key) => [key, pick(`[data-stream-count="${key}"]`)]),
+		);
+		const streamShares = new Map(
+			CATEGORY_ORDER.map((key) => [key, pick(`[data-stream-share="${key}"]`)]),
+		);
+		const streamBars = new Map(
+			CATEGORY_ORDER.map((key) => [key, pick(`[data-stream-bar="${key}"]`)]),
+		);
+
+		const badgeNodes = new Map(
+			ACHIEVEMENTS.map((badge) => [badge.id, pick(`[data-badge="${badge.id}"]`)]),
+		);
+		const badgeValues = new Map(
+			ACHIEVEMENTS.map((badge) => [badge.id, pick(`[data-badge-value="${badge.id}"]`)]),
+		);
+		const badgeMeters = new Map(
+			ACHIEVEMENTS.map((badge) => [badge.id, pick(`[data-badge-meter="${badge.id}"]`)]),
+		);
+		const badgeUnlocked = pick('[data-badge-unlocked]');
+
+		const binTabs = pickAll<HTMLButtonElement>('[data-bin-tab]');
+		const binPanels = pickAll('[data-bin-panel]');
+
+		/* ---------------- Rendering ---------------- */
+
+		function render(): void {
+			const state = getState();
+			const d = derive(state);
+
+			kpi.items.textContent = fmt.integer(state.itemsProcessed);
+			kpi.diversion.textContent = fmt.percent(d.diversionRate);
+			kpi.carbon.innerHTML = `${fmt.one(state.carbonSaved)}<span class="text-lg text-body"> kg</span>`;
+			kpi.carbonAlt.textContent = `≈ ${fmt.integer(d.milesEquivalent)} passenger miles avoided`;
+			kpi.streak.innerHTML = `${fmt.integer(state.streak)}<span class="text-lg text-body"> days</span>`;
+			kpi.points.textContent = fmt.integer(state.points);
+
+			dots.items.className = 'dot dot-pulse';
+			dots.diversion.className = 'dot dot-live';
+			dots.carbon.className = 'dot dot-live';
+			dots.streak.className = state.streak > 0 ? 'dot dot-live' : 'dot';
+
+			streakDays.forEach((node, index) => {
+				node.classList.toggle('bg-accent', index < state.streak);
+				node.classList.toggle('bg-line', index >= state.streak);
+			});
+
+			// Stream distribution, re-shared against the live total.
+			for (const key of CATEGORY_ORDER) {
+				const count = state.categoryCounts[key];
+				const share = state.itemsProcessed > 0 ? count / state.itemsProcessed : 0;
+				const countNode = streamCounts.get(key);
+				const shareNode = streamShares.get(key);
+				const barNode = streamBars.get(key);
+				if (countNode) countNode.textContent = fmt.integer(count);
+				if (shareNode) shareNode.textContent = fmt.percent(share);
+				if (barNode) barNode.style.width = `${(share * 100).toFixed(2)}%`;
+			}
+
+			// Challenge counters.
+			challengeActive.textContent = String(d.activeChallenges);
+			challengeDone.textContent = String(d.completedChallenges);
+			challengePoints.textContent = `${fmt.integer(state.points)} pts`;
+			for (const node of challengeNodes) {
+				const id = node.dataset.challenge;
+				node.setAttribute('aria-checked', String(Boolean(id && state.challenges[id])));
+			}
+
+			// Achievements.
+			let unlockedCount = 0;
+			for (const badge of ACHIEVEMENTS) {
+				const value = achievementValue(badge, state);
+				const unlocked = isUnlocked(badge, state);
+				const progress = Math.min(100, (value / badge.threshold) * 100);
+				const node = badgeNodes.get(badge.id);
+				const valueNode = badgeValues.get(badge.id);
+				const meterNode = badgeMeters.get(badge.id);
+
+				if (unlocked) unlockedCount += 1;
+				if (valueNode) {
+					valueNode.textContent =
+						badge.unit === 'percent'
+							? `${value.toFixed(1)}%`
+							: badge.unit === 'kg'
+								? fmt.one(value)
+								: fmt.integer(value);
+				}
+				if (meterNode) {
+					meterNode.style.width = `${progress.toFixed(1)}%`;
+					meterNode.style.background = unlocked ? 'var(--color-accent)' : 'var(--color-faint)';
+				}
+				if (node) {
+					node.dataset.unlocked = String(unlocked);
+					const status = node.querySelector('p.font-mono');
+					if (status) status.textContent = unlocked ? 'unlocked' : `${progress.toFixed(0)}% complete`;
+				}
+			}
+			badgeUnlocked.textContent = String(unlockedCount);
+		}
+
+		function flagUnlocked(ids: string[]): void {
+			for (const id of ids) {
+				const node = badgeNodes.get(id);
+				if (!node) continue;
+				node.dataset.justUnlocked = 'true';
+				window.setTimeout(() => node.removeAttribute('data-just-unlocked'), 1800);
+			}
+		}
+
+		/* ---------------- Challenges ---------------- */
+
+		for (const node of challengeNodes) {
+			node.addEventListener('click', () => {
+				const id = node.dataset.challenge;
+				if (!id) return;
+				const challenge = CHALLENGES.find((entry) => entry.id === id);
+				if (!challenge) return;
+
+				const { completed, points, justUnlocked } = toggleChallenge(id);
+				const swatch = CATEGORY_META[challenge.category].hex;
+
+				window.dispatchEvent(
+					new CustomEvent('reuse:challenge', {
+						detail: {
+							id,
+							completed,
+							label: challenge.label,
+							points: Math.abs(points),
+							swatch,
+						},
+					}),
+				);
+				flagUnlocked(justUnlocked.map((badge) => badge.id));
+			});
+		}
+
+		/* ---------------- Bin tabs (roving tabindex) ---------------- */
+
+		function selectBin(id: string, focus = false): void {
+			for (const tab of binTabs) {
+				const active = tab.dataset.binTab === id;
+				tab.setAttribute('aria-selected', String(active));
+				tab.tabIndex = active ? 0 : -1;
+				if (active && focus) tab.focus();
+			}
+			for (const panel of binPanels) {
+				panel.classList.toggle('hidden', panel.dataset.binPanel !== id);
+				panel.classList.toggle('block', panel.dataset.binPanel === id);
+			}
+		}
+
+		binTabs.forEach((tab, index) => {
+			tab.addEventListener('click', () => selectBin(tab.dataset.binTab ?? ''));
+			tab.addEventListener('keydown', (event) => {
+				const delta =
+					event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+				if (delta === 0) return;
+				event.preventDefault();
+				const next = (index + delta + binTabs.length) % binTabs.length;
+				selectBin(binTabs[next].dataset.binTab ?? '', true);
+			});
+		});
+
+		/* ---------------- Wiring ---------------- */
+
+		subscribe(render);
+		window.addEventListener('reuse:scan', (event) => {
+			const item = (event as CustomEvent).detail;
+			if (!item?.category) return;
+			window.dispatchEvent(
+				new CustomEvent('reuse:toast', {
+					detail: {
+						title: item.label,
+						body: item.sortDestination,
+						swatch: CATEGORY_META[item.category].hex,
+					},
+				}),
+			);
+		});
+		window.addEventListener('reuse:reset', () => {
+			resetSession();
+			selectBin(binTabs[0]?.dataset.binTab ?? '');
+		});
+
+		render();
+	}
+</script>
